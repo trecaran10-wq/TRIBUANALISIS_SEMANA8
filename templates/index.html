@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#702D43">
+  <title>Tribuanálisis | Semana 8</title>
+  <link rel="icon" href="data:,">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script defer src="{{ url_for('static', filename='js/app.js') }}"></script>
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar">
+    <a class="brand" href="#view-dashboard" data-view="dashboard" aria-label="Tribuanálisis, inicio">
+      <img class="brand-logo" src="{{ url_for('static', filename='images/imagenes_para_subir/logo_tribuanalisis.png') }}" alt="">
+    </a>
+    <div class="nav-caption">MENÚ PRINCIPAL</div>
+    <nav class="main-nav" aria-label="Navegación principal">
+      <button class="nav-link active" type="button" data-view="dashboard"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg></span><span>Dashboard</span><span class="nav-arrow">›</span></button>
+      <button class="nav-link" type="button" data-view="cases"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7.5h6l2 2h8v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M4 7.5v-2a2 2 0 0 1 2-2h4l2 2h5"/></svg></span><span>Registro y análisis</span><span class="nav-arrow">›</span></button>
+      <button class="nav-link" type="button" data-view="regimes"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19V5M20 19V5M4 12h16M9.3 5v14M14.7 5v14"/></svg></span><span>Regímenes tributarios</span><span class="nav-arrow">›</span></button>
+      <button class="nav-link" type="button" data-view="guide"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 4.5A2.5 2.5 0 0 1 7.5 2H20v17H7.5A2.5 2.5 0 0 0 5 21.5z"/><path d="M5 4.5v17M9 7h7M9 11h7"/></svg></span><span>Guía tributaria</span><span class="nav-arrow">›</span></button>
+      <button class="nav-link" type="button" data-view="profile"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg></span><span>Perfil y créditos</span><span class="nav-arrow">›</span></button>
+    </nav>
+    <img class="sidebar-illustration" src="{{ url_for('static', filename='images/imagenes_para_subir/ilustracion_sunat_calculadora.png') }}" alt="" aria-hidden="true">
+    <div class="sidebar-spacer"></div>
+    <div class="sidebar-note">
+      <span class="note-icon">✦</span>
+      <b>Decisiones con fundamento</b>
+      <p>Compara obligaciones y proyecciones antes de elegir.</p>
+    </div>
+    <div class="sidebar-user">
+      <span class="avatar" id="sidebar-avatar">TA</span>
+      <span class="sidebar-user-copy"><b id="sidebar-name">Estudiante</b><small>Cuenta académica</small></span>
+      <button type="button" class="icon-button" data-view="profile" title="Editar perfil" aria-label="Editar perfil">···</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <button type="button" class="mobile-menu" id="mobile-menu" aria-label="Abrir navegación">☰</button>
+      <div class="breadcrumb"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7M5 9v11h14V9M9 20v-7h6v7"/></svg><span>Semana 8</span><span class="crumb-slash">/</span><b id="page-crumb">Dashboard</b></div>
+      <div class="topbar-actions">
+        <span class="week-pill"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg><span><b>Semana 8</b><small>Tributación II</small></span></span>
+        <button type="button" class="notification-button" data-action="show-alerts" aria-label="Ver alertas tributarias"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><span class="notification-dot" id="notification-count" aria-hidden="true"></span></button>
+        <button type="button" class="profile-button" data-view="profile" aria-label="Abrir perfil"><span class="top-avatar" id="top-avatar">TA</span><span class="top-profile-copy"><b id="top-profile-name">Estudiante</b><small id="top-profile-email">Cuenta personal</small></span><span class="profile-chevron">⌄</span></button>
+        <button type="button" class="logout-button" id="logout-button">Salir</button>
+      </div>
+    </header>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <section class="view active" id="view-dashboard" data-page="dashboard">
+      <div class="welcome-banner">
+        <div class="welcome-copy">
+          <div class="eyebrow light-eyebrow"><span class="spark">✦</span> SISTEMA INTELIGENTE DE EVALUACIÓN</div>
+          <h1 id="welcome-title">¡Hola!</h1>
+          <p>Bienvenida a Tribuanálisis, tu sistema inteligente de evaluación, comparación y recomendación de regímenes tributarios.</p>
+          <button type="button" class="button button-light" data-action="new-case"><span class="button-plus">＋</span> Registrar un caso <span>→</span></button>
+        </div>
+        <img class="welcome-art-image" src="{{ url_for('static', filename='images/imagenes_para_subir/banner_dashboard.png') }}" alt="" aria-hidden="true">
+      </div>
+      <div class="stat-grid">
+        <article class="stat-card"><span class="stat-icon burgundy" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 4h10v2h3v15H4V6h3z"/><path d="M9 4a3 3 0 0 1 6 0M8 11h8M8 15h8M8 18h5"/></svg></span><div class="stat-copy"><span>Casos registrados</span><strong id="stat-total">0</strong></div><span class="stat-note" id="stat-total-note">en tu biblioteca</span></article>
+        <article class="stat-card"><span class="stat-icon rose" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 20h16M6 17v-5h3v5M11 17V8h3v9M16 17V4h3v13"/></svg></span><div class="stat-copy"><span>Casos analizados</span><strong id="stat-analyzed">0</strong></div><span class="stat-note" id="stat-analyzed-note">con evaluación guardada</span></article>
+        <article class="stat-card"><span class="stat-icon peach" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5zM3 12l9 5 9-5M3 16l9 5 9-5"/></svg></span><div class="stat-copy"><span>Regímenes evaluados</span><strong id="stat-regimes">0</strong></div><span class="stat-note" id="stat-regimes-note">NRUS · RER · RMT · RG</span></article>
+        <article class="stat-card"><span class="stat-icon green" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="6"/><path d="m9 13-1 8 4-2 4 2-1-8M9 8l2 2 4-4"/></svg></span><div class="stat-copy"><span>Recomendaciones generadas</span><strong id="stat-recommendations">0</strong></div><span class="stat-note" id="stat-recommendations-note">con datos suficientes</span></article>
+      </div>
+      <div class="dashboard-grid">
+        <article class="panel chart-panel"><div class="panel-heading"><div class="chart-title"><span class="chart-heading-icon">◷</span><div><h3>Distribución de casos por régimen recomendado</h3><p>Según las evaluaciones guardadas</p></div></div><span class="panel-kicker">DISTRIBUCIÓN</span></div><div class="chart-wrap"><canvas id="chart-recommendations" aria-label="Gráfico de regímenes recomendados"></canvas><div class="empty-chart" id="empty-recommendations">Aún no hay evaluaciones para mostrar.</div></div></article>
+        <article class="panel chart-panel"><div class="panel-heading"><div class="chart-title"><span class="chart-heading-icon">▥</span><div><h3>Comparativo de carga tributaria estimada</h3><p>Suma anual de estimaciones elegibles, S/</p></div></div><span class="panel-kicker">ANUAL</span></div><div class="chart-wrap"><canvas id="chart-burden" aria-label="Gráfico de carga tributaria"></canvas><div class="empty-chart" id="empty-burden">Evalúa casos para ver la comparación.</div></div></article>
+      </div>
+      <div class="dashboard-lower">
+        <article class="panel chart-panel status-panel">
+          <div class="panel-heading"><div class="chart-title"><span class="chart-heading-icon">▱</span><div><h3>Estado de los casos</h3><p>Seguimiento de evaluaciones registradas</p></div></div></div>
+          <div class="status-content"><div class="chart-wrap short-chart"><canvas id="chart-status" aria-label="Gráfico de estado de casos"></canvas><div class="empty-chart" id="empty-status">Registra tu primer caso para comenzar.</div></div><div class="analysis-rate"><span>Tasa de análisis</span><div class="progress-ring" id="analysis-progress"><strong id="analysis-rate">0%</strong></div><small id="analysis-rate-label">0 de 0 casos analizados</small></div></div>
+        </article>
+        <article class="panel mini-panel alert-panel" id="dashboard-alert-panel"><div class="panel-heading"><div class="chart-title"><span class="chart-heading-icon alert-heading-icon">⚠</span><div><h3>Alertas tributarias</h3><p>Atención preventiva</p></div></div><span class="alert-bell">!</span></div><div id="dashboard-alerts" class="alert-list"><div class="blank-state compact">No hay alertas. Las proyecciones aparecerán aquí.</div></div></article>
+        <article class="panel mini-panel activity-panel"><div class="panel-heading"><div class="chart-title"><span class="chart-heading-icon">◷</span><div><h3>Actividad reciente</h3><p>Últimos movimientos del sistema</p></div></div><button class="text-button" type="button" data-view="cases">Ver historial →</button></div><div id="activity-list" class="pending-list"><div class="blank-state compact">Sin actividad registrada.</div></div></article>
+      </div>
+      <div class="dashboard-details-grid">
+        <article class="panel chart-panel"><div class="panel-heading"><div class="chart-title"><span class="chart-heading-icon">▥</span><div><h3>Comparación por régimen</h3><p>Impuesto anual acumulado estimado</p></div></div></div><div class="chart-wrap short-chart"><canvas id="chart-compare" aria-label="Gráfico comparativo por régimen"></canvas><div class="empty-chart" id="empty-compare">Sin cifras agregadas por ahora.</div></div></article>
+        <article class="panel table-panel">
+          <div class="panel-heading"><div class="chart-title"><span class="chart-heading-icon">▤</span><div><h3>Casos recientes</h3><p>Tus últimos registros guardados</p></div></div><button class="text-button" type="button" data-view="cases">Ver todos <span>→</span></button></div>
+          <div class="table-scroll"><table><thead><tr><th>EMPRESA / NEGOCIO</th><th>RUC</th><th>ESTADO</th><th>RECOMENDACIÓN</th><th></th></tr></thead><tbody id="recent-cases"></tbody></table></div>
+          <div class="table-empty" id="recent-empty">Todavía no tienes casos registrados.</div>
+        </article>
+        <article class="panel mini-panel pending-panel"><div class="panel-heading"><div class="chart-title"><span class="chart-heading-icon">◷</span><div><h3>Pendientes de evaluación</h3><p>Casos que requieren atención</p></div></div><button class="text-button" type="button" data-view="cases">Abrir lista →</button></div><div id="pending-list" class="pending-list"><div class="blank-state compact">Todo al día.</div></div></article>
+        </div>
+      <div class="legal-strip"><span>ⓘ</span><p><b>Uso académico:</b> Las cifras son estimaciones, no declaraciones oficiales. Verifica las reglas vigentes y la situación completa con SUNAT o un profesional.</p><button type="button" class="text-button" data-view="guide">Ver fuentes →</button></div>
+    </section>
+
+    <section class="view" id="view-cases" data-page="cases" hidden>
+      <div class="cases-hero"><div class="cases-hero-copy"><div class="eyebrow">MÓDULO 01 · CONTRIBUYENTES</div><h1>Registro y análisis de casos</h1><p>Registra, importa y analiza la información de empresas o negocios para identificar el régimen tributario más conveniente.</p></div>{% if case_banner_available %}<img class="cases-hero-image" src="{{ url_for('static', filename='images/imagenes_registro/banner_registro.png') }}" alt="" aria-hidden="true">{% endif %}</div>
+      <div class="mode-tabs">
+        <button type="button" class="mode-tab active" data-case-tab="manual"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 4 6 6M4 20l4.5-1 11-11a2.1 2.1 0 0 0-3-3l-11 11L4 20Z"/></svg><span>Registro manual</span></button>
+        <button type="button" class="mode-tab" data-case-tab="excel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6M3 7h11v10H3zM6 10l5 5m0-5-5 5"/></svg><span>Importación Excel</span></button>
+        <button type="button" class="mode-tab" data-case-tab="directory"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Casos registrados</span><span class="tab-count" id="case-count-chip">0</span></button>
+      </div>
+      <div class="case-tab-panel active" id="case-tab-manual">
+        <div class="case-workspace">
+        <form id="case-form" class="panel form-panel" novalidate>
+          <input type="hidden" name="case_id">
+          <div class="form-intro"><span class="form-step">＋</span><div><h2 id="case-form-title">Registro de nuevo caso</h2><p>Completa la información del contribuyente para su análisis tributario.</p></div><div class="wizard-indicators" aria-label="Pasos del registro"><button type="button" class="wizard-dot active" data-form-goto="1" aria-label="Paso 1: Datos del contribuyente">1</button><span></span><button type="button" class="wizard-dot" data-form-goto="2" aria-label="Paso 2: Información económica">2</button><span></span><button type="button" class="wizard-dot" data-form-goto="3" aria-label="Paso 3: Estructura y operaciones">3</button><span></span><button type="button" class="wizard-dot" data-form-goto="4" aria-label="Paso 4: Planes futuros">4</button></div></div>
+          <div class="form-section" data-form-step="1"><div class="form-section-title"><span>01</span><div><h3>Datos del contribuyente</h3><p>Información general del contribuyente o negocio.</p></div></div><div class="field-grid">
+            <label class="field span-2">Razón social o nombre del negocio *<input name="business_name" required maxlength="160" placeholder="Ej. Comercial San José S.A.C."></label>
+            <label class="field">RUC *<input name="ruc" required inputmode="numeric" pattern="[0-9]{11}" maxlength="11" placeholder="11 dígitos"></label>
+            <label class="field">Tipo de persona *<select name="person_type" required><option value="natural">Persona natural</option><option value="juridica">Persona jurídica</option></select></label>
+            <label class="field">Fecha de inicio de actividades<input name="start_date" type="date"></label>
+            <label class="field">Régimen actual (opcional)<select name="current_regime"><option value="">No especificado</option><option>NRUS</option><option>RER</option><option>RMT</option><option>RG</option></select></label>
+            <label class="field span-2">Actividad económica *<input name="activity" required placeholder="Describe la actividad principal"></label>
+            <label class="field">Código CIIU<input name="ciiu" placeholder="Ej. 4711"></label>
+            <label class="field">Tipo de actividad<select name="activity_type"><option value="comercial">Comercial</option><option value="servicios">Servicios</option><option value="manufactura">Manufactura</option><option value="otra">Otra / por revisar</option></select></label>
+            <label class="field span-2">Domicilio fiscal<input name="fiscal_address" placeholder="Dirección declarada"></label>
+            <label class="field check-field span-2"><input name="excluded_activity" type="checkbox"><span>La empresa desarrolla una actividad que podría estar excluida de algún régimen (se revisará y advertirá).</span></label>
+          </div></div>
+          <div class="form-section" data-form-step="2" hidden><div class="form-section-title"><span>02</span><div><h3>Información económica</h3><p>Importes en soles. Las proyecciones son anuales.</p></div></div><div class="field-grid">
+            <label class="field">Ingresos mensuales (S/) *<input name="monthly_income" type="number" min="0" step="0.01" value="0" required></label>
+            <label class="field">Ingresos proyectados anuales (S/) *<input name="projected_annual_income" type="number" min="0" step="0.01" required></label>
+            <label class="field">Compras mensuales (S/) *<input name="monthly_purchases" type="number" min="0" step="0.01" value="0" required></label>
+            <label class="field">Compras proyectadas anuales (S/) *<input name="projected_annual_purchases" type="number" min="0" step="0.01" required></label>
+            <label class="field">Costos anuales (S/) *<input name="annual_costs" type="number" min="0" step="0.01" value="0" required></label>
+            <label class="field">Gastos anuales (S/) *<input name="annual_expenses" type="number" min="0" step="0.01" value="0" required></label>
+            <label class="field">Activos fijos (S/) *<input name="fixed_assets" type="number" min="0" step="0.01" value="0" required></label>
+            <label class="field">Activos que podrían estar excluidos del límite (S/)<input name="nrus_exempt_assets" type="number" min="0" step="0.01" value="0"><small>Ej. inmuebles o vehículos; el cómputo debe confirmarse según la norma vigente.</small></label>
+            <label class="field">Proporción de operaciones gravadas *<input name="taxable_share" type="number" min="0" max="1" step="0.01" value="1" required><small>Entre 0 y 1; usar 1 si todas están gravadas.</small></label>
+          </div></div>
+          <div class="form-section" data-form-step="3" hidden><div class="form-section-title"><span>03</span><div><h3>Estructura y operaciones</h3><p>Datos que pueden afectar requisitos y obligaciones.</p></div></div><div class="field-grid">
+            <label class="field">Cantidad total de trabajadores *<input name="workers" type="number" min="0" step="1" value="0" required></label>
+            <label class="field">Trabajadores en el turno con mayor personal *<input name="workers_per_shift" type="number" min="0" step="1" value="0" required><small>Dato usado para la regla de referencia del RER.</small></label>
+            <label class="field">Locales comerciales<input name="locales" type="number" min="0" step="1" value="1"></label>
+            <label class="field">Sucursales<input name="branches" type="number" min="0" step="1" value="0"></label>
+            <label class="field span-2">Actividades adicionales<input name="additional_activities" placeholder="Opcional"></label>
+            <label class="field span-2">Características de las operaciones<textarea name="operations" rows="2" placeholder="Operaciones, tipos de clientes, bienes o servicios…"></textarea></label>
+          </div></div>
+          <div class="form-section" data-form-step="4" hidden><div class="form-section-title"><span>04</span><div><h3>Planes futuros</h3><p>Anticipa cambios y riesgos de crecimiento.</p></div></div><div class="plan-grid">
+            <label class="plan-option"><input name="plans_increase_income" type="checkbox"><span><b>Incrementar ingresos</b><small>Espera crecer en los próximos periodos</small></span></label>
+            <label class="plan-option"><input name="plans_exceed_limits" type="checkbox"><span><b>Superar límites</b><small>Prevé superar el límite de su régimen actual</small></span></label>
+            <label class="plan-option"><input name="plans_hire_workers" type="checkbox"><span><b>Contratar personal</b><small>Planea contratar trabajadores</small></span></label>
+            <label class="plan-option"><input name="plans_add_branches" type="checkbox"><span><b>Abrir sucursales</b><small>Planea ampliar sus locales</small></span></label>
+            <label class="plan-option"><input name="plans_import" type="checkbox"><span><b>Importar productos</b><small>Iniciará operaciones de importación</small></span></label>
+            <label class="plan-option"><input name="plans_export" type="checkbox"><span><b>Exportar</b><small>Iniciará operaciones de exportación</small></span></label>
+            <label class="plan-option"><input name="plans_add_activities" type="checkbox"><span><b>Nuevas actividades</b><small>Incorporará actividades económicas</small></span></label>
+            <label class="plan-option"><input name="plans_grow_company" type="checkbox"><span><b>Crecer de tamaño</b><small>Proyecta convertirse en empresa mayor</small></span></label>
+            <label class="plan-option"><input name="plans_excluded_activity" type="checkbox"><span><b>Actividad potencialmente excluida</b><small>Incorporará actividad con restricción tributaria</small></span></label>
+          </div></div>
+          <div class="form-actions"><button type="button" class="button button-outline" id="previous-form-step" disabled>← <span>Anterior</span></button><span class="form-feedback" id="form-feedback">Completa los campos obligatorios (*) para continuar.</span><button type="button" class="button button-primary" id="next-form-step">Siguiente <span>→</span></button><button type="button" class="button button-outline" id="cancel-edit" hidden>Cancelar edición</button><button class="button button-primary" type="submit" id="save-case" hidden>Guardar caso <span>→</span></button></div>
+        </form>
+        <aside class="case-guidance">
+          <section class="panel progress-card"><div class="guidance-title"><span class="guidance-icon">⚑</span><h2>Avance del registro</h2></div><div class="progress-label"><div class="wizard-track"><span id="wizard-progress-fill"></span></div><b id="wizard-progress-percent">25%</b></div><ol class="wizard-steps">
+            <li class="active" data-guidance-step="1"><button type="button" data-form-goto="1"><span>1</span><b>Datos del contribuyente</b></button></li>
+            <li data-guidance-step="2"><button type="button" data-form-goto="2"><span>2</span><b>Información económica</b></button></li>
+            <li data-guidance-step="3"><button type="button" data-form-goto="3"><span>3</span><b>Estructura y operaciones</b></button></li>
+            <li data-guidance-step="4"><button type="button" data-form-goto="4"><span>4</span><b>Planes futuros</b></button></li>
+          </ol></section>
+          <section class="panel guidance-note"><div class="guidance-title"><span class="guidance-icon">♧</span><h2>Consideraciones</h2></div><ul><li>Completa todos los campos obligatorios (*).</li><li>La información permitirá evaluar la elegibilidad en los 4 regímenes tributarios.</li><li>Puedes guardar el caso y continuar más adelante.</li></ul></section>
+        </aside>
+        </div>
+      </div>
+      <div class="case-tab-panel" id="case-tab-excel" hidden>
+        <div class="panel import-panel"><div class="import-intro"><div class="import-icon">↥</div><div><div class="eyebrow">CARGA MASIVA</div><h2>Importa tus casos desde Excel</h2><p>Descarga la plantilla oficial de esta aplicación, completa tus datos y revisa los errores antes de guardar.</p></div></div>
+          <div class="import-actions"><a class="button button-outline" href="/api/import/template.xlsx">↓ Descargar plantilla Excel</a><button type="button" class="text-button" id="show-columns">Ver columnas esperadas⌄</button></div>
+          <div id="columns-panel" class="columns-panel" hidden></div>
+          <form id="import-form" class="upload-zone"><label for="excel-file"><span class="upload-cloud">⇧</span><b>Arrastra tu archivo o <u>selecciónalo</u></b><small>Formato .xlsx · máximo 10 MB · vista previa antes de importar</small></label><input id="excel-file" name="file" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required><button class="button button-primary" type="submit">Revisar archivo <span>→</span></button></form>
+          <div id="import-preview" class="import-preview" hidden></div>
+        </div>
+        <div class="info-callout"><span>ⓘ</span><p>El archivo de plantilla incluye una fila demostrativa identificada como ejemplo. Elimínala antes de importar registros reales.</p></div>
+      </div>
+      <div class="case-tab-panel" id="case-tab-directory" hidden>
+        <div class="panel directory-panel"><div class="directory-toolbar"><div><h2>Biblioteca de casos</h2><p>Administra y vuelve a evaluar tus contribuyentes.</p></div><div class="filter-tools"><a class="button button-outline" href="/api/cases/export.xlsx">↓ Exportar mis casos</a><label class="search-input">⌕ <input id="case-search" type="search" placeholder="Buscar por empresa o RUC"></label><select id="status-filter" aria-label="Filtrar por estado"><option value="">Todos los estados</option><option value="pending">Pendiente</option><option value="analyzed">Analizado</option></select></div></div><div class="table-scroll"><table><thead><tr><th>EMPRESA / NEGOCIO</th><th>RUC</th><th>ACTIVIDAD</th><th>RÉGIMEN ACTUAL</th><th>ESTADO</th><th>ACTUALIZADO</th><th>ACCIONES</th></tr></thead><tbody id="all-cases"></tbody></table></div><div class="table-empty" id="cases-empty">Registra tu primer caso desde el formulario.</div></div>
+      </div>
+    </section>
+
+    <section class="view" id="view-regimes" data-page="regimes" hidden>
+      <div class="regimes-hero">
+        <div class="regimes-hero-copy"><div class="eyebrow">MÓDULO 02 · COMPARACIÓN Y RECOMENDACIÓN</div><h1>Regímenes tributarios</h1><p>Conoce las alternativas, compara sus características y analiza cuál es el más conveniente para tu caso.</p></div>
+        {% if regimes_banner_available %}<img class="regimes-hero-image" src="{{ url_for('static', filename='images/imagenes_regimenes/banner_regimenes.png') }}" alt="" aria-hidden="true">{% endif %}
+        <div class="case-picker"><label for="analysis-case">Caso a comparar</label><select id="analysis-case"><option value="">Selecciona un caso registrado</option></select></div>
+      </div>
+      <div class="regime-summary-grid" id="regime-cards"></div>
+      <div class="panel regime-detail" id="regime-detail" data-empty-image="{{ 'true' if comparison_empty_available else 'false' }}"><div class="comparison-empty">
+        {% if comparison_empty_available %}<img src="{{ url_for('static', filename='images/imagenes_regimenes/comparacion_vacia.png') }}" alt="" aria-hidden="true">{% else %}<span class="comparison-empty-icon" aria-hidden="true"><svg viewBox="0 0 120 100"><path d="M25 15h55a8 8 0 0 1 8 8v62H32a12 12 0 0 1-12-12V23a8 8 0 0 1 5-8Z"/><path d="M20 74a12 12 0 0 1 12-12h56M36 32h35M36 43h28M35 64l9-13 9 7 11-17"/><circle cx="77" cy="68" r="15"/><path d="m88 79 15 15"/></svg></span>{% endif %}
+        <div class="comparison-empty-copy"><h2>Elige un caso para comparar</h2><p>El resultado se mostrará aquí sin crear un apartado adicional.</p><button class="button button-primary" type="button" data-view="cases"><span class="button-plus">＋</span> Registrar un caso</button></div>
+      </div></div>
+    </section>
+
+    <section class="view" id="view-guide" data-page="guide" hidden>
+      <div class="guide-hero"><div class="guide-hero-copy"><div class="eyebrow">CENTRO DE CONOCIMIENTO</div><h1>Guía tributaria</h1><p>Referencias normativas y recursos para profundizar en el análisis de rentas empresariales.</p></div>{% if guide_banner_available %}<img class="guide-hero-image" src="{{ url_for('static', filename='images/imagenes_guia/banner_guia.png') }}" alt="" aria-hidden="true">{% endif %}</div>
+      <div class="guide-library-heading"><div class="guide-library-title"><span class="guide-library-icon" aria-hidden="true">§</span><div><span class="eyebrow">BIBLIOTECA DE CONSULTA</span><h2>Normas y referencias</h2><p>Explora las fuentes oficiales por tema o régimen.</p></div></div><span class="guide-result-count" id="guide-result-count">8 referencias</span></div>
+      <div class="guide-controls panel"><label class="search-input"><span aria-hidden="true">⌕</span><input id="guide-search" type="search" placeholder="Buscar norma, artículo o tema"></label><label class="guide-filter"><span>Filtrar por tema</span><select id="guide-category" aria-label="Filtrar normas por categoría"><option value="">Todas las categorías</option><option value="General">Impuesto a la Renta</option><option value="NRUS">Nuevo RUS</option><option value="RER">Régimen Especial</option><option value="RMT">Régimen MYPE Tributario</option><option value="RG">Régimen General</option><option value="IGV">IGV y obligaciones</option></select></label></div>
+      <div class="guide-cards" id="guide-cards"></div>
+      <div class="source-note"><span>↗</span><p>Abre las tarjetas para consultar la referencia normativa o el apartado específico del régimen en SUNAT. Los enlaces se abren en una pestaña nueva.</p></div>
+    </section>
+
+    <section class="view" id="view-profile" data-page="profile" hidden>
+      <div class="profile-hero">
+        {% if profile_badge_available %}<img class="profile-hero-badge" src="{{ url_for('static', filename='images/imagenes_perfil/insignia_perfil.png') }}" alt="" aria-hidden="true">{% endif %}
+        <div class="profile-hero-copy"><div class="eyebrow">PREFERENCIAS Y EQUIPO</div><h1>Perfil y créditos</h1><p>Personaliza tu espacio y visualiza los créditos del proyecto.</p></div>
+        {% if profile_graduation_available %}<img class="profile-hero-art" src="{{ url_for('static', filename='images/imagenes_perfil/graduacion.png') }}" alt="" aria-hidden="true">{% endif %}
+      </div>
+      <div class="profile-layout">
+        <form id="profile-form" class="panel profile-form">
+          <div class="panel-heading"><div class="profile-heading"><span class="profile-heading-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg></span><div><h2>Mi perfil</h2><p>Información del usuario y configuración local.</p></div></div></div>
+          <div class="field-grid">
+            <label class="field span-2">Nombres y apellidos<input name="full_name" placeholder="Nombre del estudiante"></label>
+            <label class="field span-2">Correo electrónico<input name="email" type="email" placeholder="correo@universidad.edu.pe"></label>
+            <label class="field">Carrera / programa<input name="career" value="Contabilidad y Finanzas"></label>
+            <label class="field">Ciclo académico<input name="academic_cycle" placeholder="Ej. VIII ciclo"></label>
+            <label class="field">UIT de referencia (S/)<input name="uit" type="number" min="0" step="0.01" placeholder="Configúrala para evaluar el RMT"><small>Verifica el valor vigente del ejercicio antes de analizar.</small></label>
+            <label class="field">Preferencia visual<select name="theme"><option value="light">Claro</option><option value="dark">Oscuro</option></select></label>
+          </div>
+          <div class="profile-subhead"><h3>Seguridad de la cuenta</h3><p>Actualiza tu contraseña de acceso. Se almacena protegida mediante un hash.</p></div>
+          <div class="field-grid">
+            <label class="field">Contraseña actual<input name="current_password" type="password" autocomplete="current-password"></label>
+            <label class="field">Nueva contraseña<input name="new_password" type="password" minlength="8" autocomplete="new-password"></label>
+          </div>
+          <div class="form-actions"><span class="form-feedback" id="profile-feedback">Los datos quedan en esta instalación.</span><button class="button button-primary" type="submit">Guardar perfil <span>→</span></button></div>
+        </form>
+        <div class="profile-right">
+          <section class="credit-card" aria-labelledby="academic-project-title">
+            <div class="credit-card-heading"><span class="credit-project-icon" aria-hidden="true"><svg viewBox="0 0 28 24"><path d="m2 8 12-6 12 6-12 6L2 8Z"/><path d="M7 11v6c4 3 10 3 14 0v-6M26 9v8"/></svg></span><div><div class="eyebrow light-eyebrow">PROYECTO ACADÉMICO</div><h2 id="academic-project-title">Tribuanálisis</h2></div></div>
+            <div class="credit-divider"></div>
+            <dl class="credit-details">
+              <div><dt><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2 7h16M4 3h12v14H4zM7 3v14m6-14v14"/></svg>Universidad:</dt><dd>{{ academic_credits.university }}</dd></div>
+              <div><dt><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 17s6-5.2 6-10a6 6 0 1 0-12 0c0 4.8 6 10 6 10Z"/><circle cx="10" cy="7" r="2"/></svg>Filial:</dt><dd>{{ academic_credits.campus }}</dd></div>
+              <div><dt><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2 5h16M4 2h12v16H4zM7 2v3m6-3v3"/></svg>Curso:</dt><dd>{{ academic_credits.course }}</dd></div>
+              <div><dt><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m2 6 8-4 8 4-8 4-8-4Zm2 3v6l6 3 6-3V9m2-2v7"/></svg>Tema:</dt><dd>{{ academic_credits.topic }}</dd></div>
+              <div><dt><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="6" r="3"/><path d="M4 18a6 6 0 0 1 12 0"/></svg>Docente:</dt><dd>{{ academic_credits.professor }}</dd></div>
+            </dl>
+          </section>
+          <section class="panel team-card" aria-labelledby="team-title">
+            <div class="team-card-heading"><span class="team-heading-icon" aria-hidden="true"><svg viewBox="0 0 26 22"><circle cx="13" cy="6" r="4"/><circle cx="4.5" cy="8" r="3"/><circle cx="21.5" cy="8" r="3"/><path d="M5.5 20v-2a7.5 7.5 0 0 1 15 0v2m-19 0v-2a5 5 0 0 1 3-4.6M24.5 20v-2a5 5 0 0 0-3-4.6"/></svg></span><div><h2 id="team-title">Integrantes (Créditos)</h2><p>Equipo académico · datos fijos del proyecto</p></div></div>
+            <ul class="team-list">{% for member in academic_credits.team %}<li><span class="team-member-icon" aria-hidden="true"><svg viewBox="0 0 20 20"><circle cx="10" cy="6" r="3.3"/><path d="M3.5 18a6.5 6.5 0 0 1 13 0"/></svg></span>{{ member }}</li>{% endfor %}</ul>
+          </section>
+          <div class="panel settings-card"><span class="settings-icon">⚙</span><div><b>Almacenamiento</b><p>SQLite local · persistente entre sesiones</p><small>No se sincronizan datos con la nube.</small></div></div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="app-footer">TRIBUANÁLISIS <span>·</span> Tributación II <span>·</span> Semana 8 <span class="footer-right">Herramienta académica de apoyo</span></footer>
+  </main>
+</div>
+<dialog id="regime-dialog" class="regime-dialog"><button type="button" class="dialog-close" data-close-dialog aria-label="Cerrar">×</button><div id="regime-dialog-content"></div></dialog>
+</body>
+</html>

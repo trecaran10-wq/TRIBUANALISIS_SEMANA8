@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#702D43">
+  <title>Iniciar sesión | Tribuanálisis</title>
+  <link rel="icon" href="data:,">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <script defer src="{{ url_for('static', filename='js/auth.js') }}"></script>
+</head>
+<body class="auth-page">
+  <main class="auth-layout">
+    <section class="auth-showcase">
+      <a class="auth-brand" href="/" aria-label="Tribuanálisis">
+        <img src="{{ url_for('static', filename='images/imagenes_para_subir/logo_tribuanalisis.png') }}" alt="">
+        <span>Tribuanálisis</span>
+      </a>
+      <div class="auth-showcase-copy">
+        <span class="auth-kicker">TRIBUTACIÓN II · SEMANA 8</span>
+        <h1>Tus análisis tributarios, en un solo lugar.</h1>
+        <p>Guarda tus casos, compara regímenes y consulta tus evaluaciones desde tu cuenta personal.</p>
+        <div class="auth-feature"><span>01</span><b>Casos privados para cada cuenta</b></div>
+        <div class="auth-feature"><span>02</span><b>Evaluaciones e historial guardados</b></div>
+      </div>
+      <span class="auth-decoration auth-decoration-one" aria-hidden="true"></span>
+      <span class="auth-decoration auth-decoration-two" aria-hidden="true"></span>
+    </section>
+    <section class="auth-card-wrap">
+      <div class="auth-card">
+        <div class="auth-card-heading">
+          <span class="auth-mark" aria-hidden="true">§</span>
+          <div><span class="eyebrow">ESPACIO PERSONAL</span><h2 id="auth-title">Bienvenida de nuevo</h2><p id="auth-description">Ingresa para continuar con tus casos.</p></div>
+        </div>
+        <div class="auth-switch" role="tablist" aria-label="Acceso a la cuenta">
+          <button type="button" class="auth-switch-button active" id="show-login" role="tab" aria-selected="true">Iniciar sesión</button>
+          <button type="button" class="auth-switch-button" id="show-register" role="tab" aria-selected="false">Crear cuenta</button>
+        </div>
+        <form id="login-form" class="auth-form">
+          <label class="auth-field">Correo electrónico<input name="email" type="email" required autocomplete="email" placeholder="tu@correo.com"></label>
+          <label class="auth-field">Contraseña<input name="password" type="password" required autocomplete="current-password" placeholder="Tu contraseña"></label>
+          <button class="auth-submit" type="submit">Iniciar sesión <span aria-hidden="true">→</span></button>
+        </form>
+        <form id="register-form" class="auth-form" hidden>
+          <label class="auth-field">Nombres y apellidos<input name="full_name" required maxlength="160" autocomplete="name" placeholder="Tu nombre completo"></label>
+          <label class="auth-field">Correo electrónico<input name="email" type="email" required maxlength="254" autocomplete="email" placeholder="tu@correo.com"></label>
+          <label class="auth-field">Contraseña<input name="password" type="password" required minlength="8" autocomplete="new-password" placeholder="Mínimo 8 caracteres"></label>
+          {% if registration_requires_code %}<label class="auth-field">Código de acceso<input name="invite_code" type="password" required autocomplete="off" placeholder="Código inicial de Render"></label>{% endif %}
+          <button class="auth-submit" type="submit">Crear mi cuenta <span aria-hidden="true">→</span></button>
+          <p class="auth-privacy-note">Tu cuenta tendrá su propio espacio y solo podrá acceder a sus casos.</p>
+        </form>
+        <p class="auth-feedback" id="auth-feedback" role="status" aria-live="polite"></p>
+        <div class="auth-footer">Universidad Nacional de Trujillo <span>·</span> Filial Valle Jequetepeque</div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
