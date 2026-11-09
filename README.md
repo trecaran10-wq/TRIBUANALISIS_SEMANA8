@@ -19,11 +19,22 @@ La base de datos se crea automáticamente en `instance\tribuanalisis.db` y persi
 
 ## Despliegue
 
-Este proyecto usa Flask y escribe en SQLite. El repositorio no incluye una adaptación específica para Vercel; antes de desplegarlo allí, verifica que el entorno conserve los archivos de la base de datos entre ejecuciones. No publiques `instance`, archivos `.db`, claves de sesión ni datos de usuarios. Si el almacenamiento del hosting es efímero, se necesita una base de datos persistente externa o adaptar la aplicación.
+El proyecto conserva SQLite para uso local y admite PostgreSQL mediante `DATABASE_URL` para desplegarlo en Vercel con Supabase. La base PostgreSQL se inicializa automáticamente al arrancar la aplicación. En Vercel configura estas variables privadas antes del despliegue:
+
+- `DATABASE_URL`: URL PostgreSQL del **pooler de transacciones** de Supabase con SSL habilitado. No uses la URL en el navegador ni la compartas por el chat.
+- `TRIBUANALISIS_SECRET_KEY`: clave aleatoria larga y fija, generada desde Vercel.
+- `TRIBUANALISIS_COOKIE_SECURE`: `1`.
+- `TRIBUANALISIS_REGISTRATION_CODE`: opcional y temporal para proteger el primer registro; elimínala después de crear tu cuenta.
+
+En Vercel, elige el preset **Flask** y deja el directorio raíz `./`: `app.py`, `requirements.txt`, `templates` y `static` están en la raíz del repositorio. La aplicación no usa la SQLite local cuando `DATABASE_URL` está configurada; en Vercel falla de forma explícita si faltan las variables de PostgreSQL o de sesión.
+
+Para configurar Supabase, crea un proyecto y en el panel usa **Connect → Transaction pooler**. Copia la URI PostgreSQL completa y configura el campo `DATABASE_URL` en **Variables ambientales** de Vercel. Genera una clave privada localmente con `python -c "import secrets; print(secrets.token_urlsafe(48))"` y guárdala como `TRIBUANALISIS_SECRET_KEY`; no pegues la URL ni la clave en GitHub ni en el chat. Agrega `TRIBUANALISIS_COOKIE_SECURE` con valor `1`. Configura estas variables antes de pulsar **Despliegue**; cada cambio posterior requiere un nuevo despliegue.
+
+No publiques `instance`, archivos `.db`, claves de sesión ni datos de usuarios. La base local no se copia automáticamente a Supabase; importa o migra registros existentes solo después de decidirlo.
 
 ## Los cinco apartados
 
-1. **Dashboard:** indicadores y gráficos calculados desde SQLite.
+1. **Dashboard:** indicadores y gráficos calculados desde la base de datos configurada.
 2. **Registro y análisis:** formulario completo, importación masiva Excel, edición, eliminación e historial de evaluaciones.
 3. **Regímenes tributarios:** fichas con acceso directo a la página SUNAT de cada régimen, comparación personalizada, estimación, recomendación preliminar, proyección, alertas, Excel y PDF.
 4. **Guía tributaria:** buscador y filtros con referencias y enlaces directos a los apartados SUNAT correspondientes.

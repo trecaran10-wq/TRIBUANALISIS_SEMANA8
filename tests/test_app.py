@@ -1,10 +1,11 @@
 import io
 import os
+import sqlite3
 import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pandas as pd
 
@@ -64,6 +65,60 @@ class ApplicationTests(unittest.TestCase):
             json={"full_name": "Estudiante de prueba", "email": "estudiante@example.edu", "password": "clave-segura-123"},
         )
         self.assertEqual(response.status_code, 201, response.get_json())
+
+    def test_vercel_requires_postgres_instead_of_local_sqlite(self):
+        environment = os.environ.copy()
+        environment.pop("DATABASE_URL", None)
+        environment["VERCEL"] = "1"
+        with patch.dict(os.environ, environment, clear=True):
+            with self.assertRaisesRegex(RuntimeError, "DATABASE_URL"):
+                webapp.connect_db()
+
+    def test_database_url_rejects_non_postgresql_schemes(self):
+        with patch.dict(os.environ, {"DATABASE_URL": "sqlite:///local.db"}):
+            with self.assertRaisesRegex(ValueError, "PostgreSQL"):
+                webapp.connect_db()
+
+    def test_postgres_connection_translates_placeholders_and_commits(self):
+        import psycopg
+
+        underlying = MagicMock()
+        with patch("psycopg.connect", return_value=underlying) as connect:
+            db = webapp.PostgresConnection("postgresql://user:password@example.test/db")
+            cursor = db.execute("SELECT id FROM users WHERE email=?", ("user@example.com",))
+            self.assertIs(cursor, underlying.execute.return_value)
+            underlying.execute.assert_called_once_with(
+                "SELECT id FROM users WHERE email=%s", ("user@example.com",)
+            )
+            db.__exit__(None, None, None)
+        connect.assert_called_once()
+        self.assertIsNone(connect.call_args.kwargs["prepare_threshold"])
+        underlying.commit.assert_called_once()
+        underlying.close.assert_called_once()
+
+    def test_postgres_integrity_errors_are_rolled_back_and_normalized(self):
+        import psycopg
+
+        underlying = MagicMock()
+        underlying.execute.side_effect = psycopg.IntegrityError("duplicate key")
+        with patch("psycopg.connect", return_value=underlying):
+            db = webapp.PostgresConnection("postgresql://user:password@example.test/db")
+            with self.assertRaisesRegex(sqlite3.IntegrityError, "duplicate key"):
+                db.execute("INSERT INTO users (email) VALUES (?)", ("same@example.com",))
+        underlying.rollback.assert_called_once()
+
+    def test_postgres_schema_initialization_creates_user_scoped_tables(self):
+        db = MagicMock()
+        db.__enter__.return_value = db
+        with patch.object(webapp, "connect_db", return_value=db):
+            webapp.initialize_postgres_db()
+        statements = [call.args[0] for call in db.execute.call_args_list]
+        self.assertTrue(any("CREATE TABLE IF NOT EXISTS cases" in sql for sql in statements))
+        self.assertTrue(any("UNIQUE(owner_id,ruc)" in sql for sql in statements))
+        self.assertTrue(any("CREATE TABLE IF NOT EXISTS user_profiles" in sql for sql in statements))
+        self.assertTrue(any("CREATE TABLE IF NOT EXISTS evaluations" in sql for sql in statements))
+        self.assertTrue(any("CREATE TABLE IF NOT EXISTS import_batches" in sql for sql in statements))
+        db.commit.assert_called_once()
 
     def test_authentication_is_required_and_accounts_are_isolated(self):
         guest = webapp.app.test_client()
