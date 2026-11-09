@@ -1,6 +1,6 @@
 import unittest
 
-from engine import evaluate_case
+from engine import ALERT_MESSAGES, alert_priority, evaluate_case
 
 
 def sample_case(**changes):
@@ -69,6 +69,13 @@ class RegimeEngineTests(unittest.TestCase):
     def test_future_growth_creates_alert(self):
         result = evaluate_case(sample_case(plans={"increase_income": True}), uit=5500)
         self.assertTrue(any("crecimiento" in alert.lower() for alert in result["alerts"]))
+
+    def test_alert_priorities_put_exclusions_and_limits_before_growth(self):
+        self.assertLess(alert_priority(ALERT_MESSAGES["declared_exclusion"]), alert_priority(ALERT_MESSAGES["planned_exclusion"]))
+        self.assertLess(alert_priority(ALERT_MESSAGES["exceed_limits"]), alert_priority(ALERT_MESSAGES["income_rer"]))
+        self.assertLess(alert_priority(ALERT_MESSAGES["planned_exclusion"]), alert_priority(ALERT_MESSAGES["income_nrus"]))
+        self.assertLess(alert_priority(ALERT_MESSAGES["purchases_rer"]), alert_priority(ALERT_MESSAGES["increase_income"]))
+        self.assertEqual(alert_priority("Alerta histórica desconocida"), alert_priority(ALERT_MESSAGES["expansion"]))
 
 
 if __name__ == "__main__":

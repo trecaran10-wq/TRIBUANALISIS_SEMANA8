@@ -21,7 +21,7 @@ from flask import Flask, g, jsonify, render_template, request, send_file, sessio
 from flask.json.provider import DefaultJSONProvider
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from engine import evaluate_case, regime_catalog
+from engine import alert_priority, evaluate_case, regime_catalog
 
 
 ROOT = Path(__file__).resolve().parent
@@ -710,17 +710,27 @@ def dashboard():
     recommended: dict[str, int] = {}
     status: dict[str, int] = {}
     burden: dict[str, float] = {}
+    alert_groups = []
+    ranked_alerts = []
     for case in cases:
         status[case["status"]] = status.get(case["status"], 0) + 1
         result = case["latest_evaluation"]
         if not result:
             continue
+        items = result.get("alerts", [])
+        if items:
+            alert_groups.append({"case": case["business_name"], "items": items})
+            ranked_alerts.extend(
+                {"case_id": case["id"], "case": case["business_name"], "text": text}
+                for text in items
+            )
         regime = result.get("recommendation") or "Sin recomendación"
         recommended[regime] = recommended.get(regime, 0) + 1
         for code, row in result.get("regimes", {}).items():
             amount = row.get("estimated_annual_total")
             if row.get("applicable") and amount is not None:
                 burden[code] = burden.get(code, 0) + amount
+    ranked_alerts.sort(key=lambda alert: alert_priority(alert["text"]))
     return jsonify({
         "total": len(cases),
         "analyzed": sum(bool(row["latest_evaluation"]) for row in cases),
@@ -731,10 +741,8 @@ def dashboard():
         "burden": burden,
         "recent": cases[:5],
         "pending": [row for row in cases if not row["latest_evaluation"]],
-        "alerts": [
-            {"case": row["business_name"], "items": row["latest_evaluation"]["alerts"]}
-            for row in cases if row["latest_evaluation"] and row["latest_evaluation"].get("alerts")
-        ][:5],
+        "alerts": alert_groups,
+        "ranked_alerts": ranked_alerts,
     })
 
 

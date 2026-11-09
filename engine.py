@@ -85,6 +85,31 @@ IGV_RATE = 0.18
 RMT_FIRST_BRACKET_UIT = 15
 RMT_FIRST_BRACKET_RATE = 0.10
 
+ALERT_MESSAGES = {
+    "income_nrus": "NRUS: los ingresos proyectados se acercan al límite anual de referencia.",
+    "income_rer": "RER: los ingresos proyectados se acercan al límite anual de referencia.",
+    "purchases_rer": "RER: las compras proyectadas se acercan al límite anual de referencia.",
+    "increase_income": "El plan de crecimiento puede cambiar la elegibilidad; vuelve a evaluar con la proyección actualizada.",
+    "exceed_limits": "Se prevé superar límites del régimen actual; revisa el momento y las reglas de cambio de régimen.",
+    "expansion": "Los planes de expansión pueden afectar la elegibilidad o las obligaciones; confirma el supuesto legal aplicable.",
+    "planned_exclusion": "Se declaró un plan de actividad potencialmente excluida; revisa la norma antes de acogerte.",
+    "declared_exclusion": "Se marcó una posible actividad excluida. La descripción requiere revisión profesional.",
+}
+ALERT_PRIORITIES = {
+    ALERT_MESSAGES["declared_exclusion"]: 0,
+    ALERT_MESSAGES["exceed_limits"]: 0,
+    ALERT_MESSAGES["planned_exclusion"]: 1,
+    ALERT_MESSAGES["income_nrus"]: 2,
+    ALERT_MESSAGES["income_rer"]: 2,
+    ALERT_MESSAGES["purchases_rer"]: 2,
+    ALERT_MESSAGES["increase_income"]: 3,
+    ALERT_MESSAGES["expansion"]: 3,
+}
+
+
+def alert_priority(message: str) -> int:
+    return ALERT_PRIORITIES.get(message, 3)
+
 
 def _number(data: dict[str, Any], key: str, default: float = 0) -> float:
     try:
@@ -217,19 +242,19 @@ def evaluate_case(data: dict[str, Any], uit: float | None = None) -> dict[str, A
         if code in ("NRUS", "RER"):
             limit = rule["income_limit"]
             if limit and revenue >= limit * 0.8:
-                alerts.append(f"{code}: los ingresos proyectados se acercan al límite anual de referencia.")
+                alerts.append(ALERT_MESSAGES[f"income_{code.lower()}"])
         if code == "RER" and purchase >= rule["purchase_limit"] * 0.8:
-            alerts.append("RER: las compras proyectadas se acercan al límite anual de referencia.")
+            alerts.append(ALERT_MESSAGES["purchases_rer"])
     if plans.get("increase_income"):
-        alerts.append("El plan de crecimiento puede cambiar la elegibilidad; vuelve a evaluar con la proyección actualizada.")
+        alerts.append(ALERT_MESSAGES["increase_income"])
     if plans.get("exceed_limits"):
-        alerts.append("Se prevé superar límites del régimen actual; revisa el momento y las reglas de cambio de régimen.")
+        alerts.append(ALERT_MESSAGES["exceed_limits"])
     if plans.get("add_branches") or plans.get("add_activities") or plans.get("grow_company"):
-        alerts.append("Los planes de expansión pueden afectar la elegibilidad o las obligaciones; confirma el supuesto legal aplicable.")
+        alerts.append(ALERT_MESSAGES["expansion"])
     if plans.get("excluded_activity"):
-        alerts.append("Se declaró un plan de actividad potencialmente excluida; revisa la norma antes de acogerte.")
+        alerts.append(ALERT_MESSAGES["planned_exclusion"])
     if declared_exclusion:
-        alerts.append("Se marcó una posible actividad excluida. La descripción requiere revisión profesional.")
+        alerts.append(ALERT_MESSAGES["declared_exclusion"])
 
     applicable_codes = [
         code for code, result in regime_results.items()

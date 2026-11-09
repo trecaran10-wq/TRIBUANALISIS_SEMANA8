@@ -217,6 +217,29 @@ class ApplicationTests(unittest.TestCase):
         self.assertEqual(self.client.get(f"/api/cases/{case_id}/comparison.xlsx").mimetype, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         self.assertEqual(self.client.get(f"/api/cases/{case_id}/report.pdf").mimetype, "application/pdf")
 
+    def test_dashboard_prioritizes_alerts_across_all_cases(self):
+        urgent = sample_case(ruc=make_ruc("2012345600"))
+        urgent["business_name"] = "Caso prioritario"
+        urgent["excluded_activity"] = True
+        urgent_id = self.client.post("/api/cases", json=urgent).get_json()["id"]
+        self.assertEqual(self.client.post(f"/api/cases/{urgent_id}/evaluate").status_code, 200)
+
+        for number in range(1, 7):
+            case = sample_case(ruc=make_ruc(f"20123456{number:02d}"))
+            case["business_name"] = f"Caso {number}"
+            case["plans"] = {"increase_income": True}
+            case_id = self.client.post("/api/cases", json=case).get_json()["id"]
+            self.assertEqual(self.client.post(f"/api/cases/{case_id}/evaluate").status_code, 200)
+
+        response = self.client.get("/api/dashboard")
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertEqual(len(payload["alerts"]), 7)
+        self.assertEqual(len(payload["ranked_alerts"]), 14)
+        self.assertEqual(payload["ranked_alerts"][0]["case_id"], urgent_id)
+        self.assertIn("posible actividad excluida", payload["ranked_alerts"][0]["text"])
+        self.assertTrue(all(item["case_id"] and item["case"] and item["text"] for item in payload["ranked_alerts"]))
+
     def test_export_cases_is_private_and_matches_excel_import_columns(self):
         guest = webapp.app.test_client()
         self.assertEqual(guest.get("/api/cases/export.xlsx").status_code, 401)

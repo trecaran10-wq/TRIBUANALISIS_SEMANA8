@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const state = { cases: [], profile: {}, regimes: [], charts: {}, activeCase: null, importBatch: null, importRows: [], caseStep: 1 };
+  const state = { cases: [], profile: {}, regimes: [], charts: {}, alerts: [], activeCase: null, importBatch: null, importRows: [], caseStep: 1 };
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
   const money = value => value == null || Number.isNaN(Number(value)) ? "—" : new Intl.NumberFormat("es-PE", { style: "currency", currency: "PEN", maximumFractionDigits: 0 }).format(Number(value));
@@ -167,7 +167,8 @@
       $("#stat-analyzed").textContent = data.analyzed;
       $("#stat-regimes").textContent = data.regimes_evaluated;
       $("#stat-recommendations").textContent = data.recommendations;
-      const alertCount = data.alerts.reduce((count, entry) => count + entry.items.length, 0);
+      state.alerts = data.ranked_alerts;
+      const alertCount = state.alerts.length;
       $("#notification-count").textContent = alertCount ? String(alertCount) : "";
       $("#notification-count").hidden = !alertCount;
       $(".notification-button").setAttribute("aria-label", alertCount ? `Ver ${alertCount} alertas tributarias` : "Ver alertas tributarias");
@@ -184,12 +185,18 @@
       chart("chart-compare", "line", burdens.map(item => item[0]), burdens.map(item => item[1]), burdens.map(item => regimeColor(item[0])), { currency: true, plugins: { legend: { display: false } } });
       $("#recent-cases").innerHTML = data.recent.map(row => `<tr><td><span class="company-cell"><span class="company-mark">${escapeHtml((row.business_name || "?")[0].toUpperCase())}</span>${escapeHtml(row.business_name)}</span></td><td>${escapeHtml(row.ruc)}</td><td><span class="status-pill ${row.latest_evaluation ? "done" : ""}">${row.latest_evaluation ? "Analizado" : "Pendiente"}</span></td><td>${escapeHtml(regimeName(row.recommended_regime))}</td><td><button class="text-button" data-action="open-case-analysis" data-id="${row.id}">Ver →</button></td></tr>`).join("");
       $("#recent-empty").style.display = data.recent.length ? "none" : "block";
-      $("#dashboard-alerts").innerHTML = data.alerts.length ? data.alerts.flatMap(entry => entry.items.map(text => `<div class="alert-row"><span class="alert-dot"></span><span><b>${escapeHtml(entry.case)}:</b> ${escapeHtml(text)}</span></div>`)).join("") : '<div class="blank-state compact">No hay alertas. Las proyecciones aparecerán aquí.</div>';
+      $("#dashboard-alerts").innerHTML = alertCount
+        ? state.alerts.slice(0, 5).map(alertHtml).join("") + (alertCount > 5 ? `<button type="button" class="text-button alerts-more" data-action="show-all-alerts">Ver todas las alertas (${alertCount}) →</button>` : "")
+        : '<div class="blank-state compact">No hay alertas. Las proyecciones aparecerán aquí.</div>';
       $("#pending-list").innerHTML = data.pending.length ? data.pending.slice(0, 4).map(row => `<div class="pending-row"><span class="company-mark">${escapeHtml((row.business_name || "?")[0].toUpperCase())}</span><span><b>${escapeHtml(row.business_name)}</b><br>Requiere evaluación</span><button class="text-button" data-action="evaluate-case" data-id="${row.id}">Evaluar</button></div>`).join("") : '<div class="blank-state compact">Todo al día.</div>';
       $("#activity-list").innerHTML = data.recent.length ? data.recent.slice(0, 4).map(row => `<div class="pending-row"><span class="company-mark">${row.latest_evaluation ? "✓" : "+"}</span><span><b>${escapeHtml(row.business_name)}</b><br>${row.latest_evaluation ? "Evaluación guardada" : "Caso registrado"} · ${escapeHtml((row.updated_at || "").slice(0, 10))}</span></div>`).join("") : '<div class="blank-state compact">Sin actividad registrada.</div>';
     } catch (error) {
       notify(error.message, true);
     }
+  }
+
+  function alertHtml(alert) {
+    return `<div class="alert-row"><span class="alert-dot"></span><span class="alert-content"><b>${escapeHtml(alert.case)}:</b> ${escapeHtml(alert.text)} <button type="button" class="text-button" data-action="open-case-alerts" data-id="${escapeHtml(alert.case_id)}">Ver caso →</button></span></div>`;
   }
 
   function setCaseTab(tab) {
@@ -377,7 +384,7 @@
       <div class="analysis-metrics"><div class="metric-box"><span>Ingresos proyectados</span><b>${money(item.data.projected_annual_income)}</b></div><div class="metric-box"><span>Compras proyectadas</span><b>${money(item.data.projected_annual_purchases)}</b></div><div class="metric-box"><span>Costos y gastos</span><b>${money(Number(item.data.annual_costs || 0) + Number(item.data.annual_expenses || 0))}</b></div><div class="metric-box"><span>Regímenes elegibles</span><b>${result.eligible_regimes.length} de 4</b></div></div>
       ${table}
       <div class="recommendation-card"><div class="recommendation-seal">✦</div><div><span class="eyebrow">RÉGIMEN RECOMENDADO</span><h3>${recommendation}</h3><a class="recommendation-sunat-link" href="${regimeSunatPages[result.recommendation].url}" target="_blank" rel="noopener noreferrer">Abrir este régimen en SUNAT ↗</a><p>${escapeHtml(result.recommendation_reason)}</p><p><b>Método de selección:</b> ${escapeHtml(result.decision_method || "")}</p></div></div>
-      <div class="result-columns"><div class="result-box"><h4>Ventajas del régimen recomendado</h4><ul><li>${escapeHtml(result.recommendation_benefits)}</li></ul><h4 style="margin-top:12px">Obligaciones principales</h4><ul><li>${escapeHtml(result.recommendation_obligations)}</li></ul></div><div class="result-box"><h4>Proyección de crecimiento</h4><ul>${future.map(text => `<li>${escapeHtml(text)}</li>`).join("")}</ul></div><div class="result-box"><h4>Alternativas y limitaciones</h4>${result.alternatives_considered?.length ? `<ul>${result.alternatives_considered.map(row => `<li>${escapeHtml(regimeName(row.regime))}: ${escapeHtml(money(row.estimated_total))} estimado. ${escapeHtml(row.reason_not_selected)}</li>`).join("")}</ul>` : "<p>No hay alternativas adicionales elegibles con los datos actuales.</p>"}<p><b>Limitaciones:</b> ${escapeHtml(result.recommendation_limitations || "Revisa las exclusiones aplicables antes de decidir.")}</p></div><div class="result-box"><h4>Alertas y riesgos</h4>${risks.length ? `<ul>${risks.map(text => `<li>${escapeHtml(text)}</li>`).join("")}</ul>` : '<ul><li>No se detectaron alertas con los datos declarados.</li></ul>'}</div></div>
+      <div class="result-columns"><div class="result-box"><h4>Ventajas del régimen recomendado</h4><ul><li>${escapeHtml(result.recommendation_benefits)}</li></ul><h4 style="margin-top:12px">Obligaciones principales</h4><ul><li>${escapeHtml(result.recommendation_obligations)}</li></ul></div><div class="result-box"><h4>Proyección de crecimiento</h4><ul>${future.map(text => `<li>${escapeHtml(text)}</li>`).join("")}</ul></div><div class="result-box"><h4>Alternativas y limitaciones</h4>${result.alternatives_considered?.length ? `<ul>${result.alternatives_considered.map(row => `<li>${escapeHtml(regimeName(row.regime))}: ${escapeHtml(money(row.estimated_total))} estimado. ${escapeHtml(row.reason_not_selected)}</li>`).join("")}</ul>` : "<p>No hay alternativas adicionales elegibles con los datos actuales.</p>"}<p><b>Limitaciones:</b> ${escapeHtml(result.recommendation_limitations || "Revisa las exclusiones aplicables antes de decidir.")}</p></div><div class="result-box" id="case-alerts"><h4>Alertas y riesgos</h4>${risks.length ? `<ul>${risks.map(text => `<li>${escapeHtml(text)}</li>`).join("")}</ul>` : '<ul><li>No se detectaron alertas con los datos declarados.</li></ul>'}</div></div>
       <div class="result-caveat"><b>Simulación, no declaración oficial.</b> ${result.assumptions.map(escapeHtml).join(" ")}</div>
     </div>`;
   }
@@ -605,10 +612,19 @@
         if (!$("#view-dashboard").classList.contains("active")) navigate("dashboard");
         $("#dashboard-alert-panel").scrollIntoView({ behavior: "smooth", block: "center" });
         break;
+      case "show-all-alerts":
+        $("#regime-dialog-content").innerHTML = `<span class="eyebrow">ATENCIÓN PREVENTIVA</span><h2>Todas las alertas tributarias (${state.alerts.length})</h2><p>Ordenadas por prioridad orientativa; revisa la situación de cada caso.</p><div class="alert-list">${state.alerts.map(alertHtml).join("")}</div>`;
+        $("#regime-dialog").showModal();
+        break;
       case "evaluate-case":
         await evaluateCase(id); break;
       case "open-case-analysis":
         navigate("regimes"); $("#analysis-case").value = id; renderAnalysis(id); break;
+      case "open-case-alerts":
+        if ($("#regime-dialog").open) $("#regime-dialog").close();
+        navigate("regimes"); $("#analysis-case").value = id; renderAnalysis(id);
+        $("#case-alerts")?.scrollIntoView({ behavior: "smooth", block: "center" });
+        break;
       case "edit-case": {
         const row = state.cases.find(item => String(item.id) === String(id));
         if (row) { navigate("cases"); setCaseTab("manual"); fillCaseForm(row); $("#case-form").scrollIntoView({ behavior: "smooth", block: "start" }); }

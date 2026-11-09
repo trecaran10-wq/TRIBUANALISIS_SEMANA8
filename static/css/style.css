@@ -141,6 +141,9 @@ tbody tr:last-child td { border-bottom: 0; }
 .alert-list, .pending-list { display: grid; gap: 8px; margin-top: 12px; }
 .alert-row, .pending-row { display: flex; align-items: flex-start; gap: 8px; padding: 8px; border-radius: 7px; background: #FCF8F9; font-size: 9px; line-height: 1.45; }
 .alert-dot { flex: 0 0 6px; height: 6px; margin-top: 4px; border-radius: 50%; background: #D6A152; }
+.alert-content { min-width: 0; overflow-wrap: anywhere; }
+.alert-content .text-button { display: inline-block; margin-left: 3px; white-space: nowrap; }
+.alerts-more { justify-self: start; margin: 4px 0 0; }
 .pending-row { align-items: center; color: #6E5A62; }
 .pending-row b { color: var(--text); }
 .blank-state { padding: 42px 18px; text-align: center; color: #9A858E; }

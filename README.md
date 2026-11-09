@@ -42,6 +42,8 @@ No publiques `instance`, archivos `.db`, claves de sesión ni datos de usuarios.
 
 Chart.js se carga desde jsDelivr; para ver los gráficos, el navegador requiere conexión a Internet. El resto de la aplicación funciona localmente.
 
+En el Dashboard se muestran hasta cinco alertas, priorizando posibles exclusiones y la previsión de superar límites, seguidas por actividades futuras excluidas, cercanía a límites y planes de crecimiento. Esta prioridad es orientativa, no una calificación legal. Cada alerta permite abrir el caso; cuando hay más de cinco, **Ver todas las alertas** permite consultar las restantes.
+
 ## Importación de Excel
 
 Descarga la plantilla desde **Registro y análisis → Importación Excel**, conserva los encabezados y elimina la fila demostrativa. Solo son obligatorias las columnas y los valores indicados por la aplicación; los campos opcionales pueden quedar vacíos. Los importes deben ser números finitos no negativos, las cantidades de trabajadores, locales y sucursales deben ser enteras, y `taxable_share` debe estar entre 0 y 1. La fecha opcional `start_date` admite una fecha de Excel o `AAAA-MM-DD`; los campos booleanos admiten, entre otros, `sí`/`no` o `1`/`0`.
