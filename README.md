@@ -17,50 +17,9 @@ Abre `http://127.0.0.1:5000`. Si ya existe el entorno `D:\TRIBUANALISIS_2U\.venv
 
 La base de datos se crea automáticamente en `instance\tribuanalisis.db` y persiste entre ejecuciones. Para elegir otra ubicación, define la variable de entorno `TRIBUANALISIS_DB` antes de iniciar el servidor.
 
-## Publicar gratuitamente en PythonAnywhere
+## Despliegue
 
-El plan gratuito ofrece una aplicación web pública en `tuusuario.pythonanywhere.com` y 512 MB de almacenamiento persistente. Tiene límites de conexiones salientes; esta aplicación no necesita servicios externos desde el backend. Chart.js y las fuentes se descargan directamente en el navegador.
-
-1. Inicia sesión en la aplicación local. Antes de desplegar, se prepara por separado un ZIP con el código y una copia de la base SQLite; esta última contiene cuentas, casos e historial. **No subas la base de datos a GitHub ni la hagas pública.**
-2. Crea una cuenta **Beginner** gratuita en PythonAnywhere. En la pestaña **Files**, sube ambos archivos privados a tu directorio personal.
-3. Abre una consola Bash y extrae el código y coloca la base en la carpeta persistente del proyecto:
-
-   ```bash
-   mkdir -p ~/tribuanalisis/instance
-   unzip ~/tribuanalisis-pythonanywhere.zip -d ~/tribuanalisis
-   cp ~/tribuanalisis-migration.sqlite3 ~/tribuanalisis/instance/tribuanalisis.db
-   ```
-
-4. Crea el entorno e instala los requisitos:
-
-   ```bash
-   mkvirtualenv --python=/usr/bin/python3.13 tribuanalisis
-   workon tribuanalisis
-   pip install -r ~/tribuanalisis/requirements.txt
-   ```
-
-5. En **Web**, crea una aplicación con **Manual configuration** y Python 3.13 (o la versión disponible que coincida con el entorno). Asocia `~/.virtualenvs/tribuanalisis` en el campo **Virtualenv**.
-6. Edita el archivo WSGI que proporciona PythonAnywhere. Antes de importar la aplicación, añade (cambia `YOUR_USERNAME` por tu usuario y el código temporal por una clave aleatoria larga):
-
-   ```python
-   import os
-   import sys
-
-   project_path = "/home/YOUR_USERNAME/tribuanalisis"
-   if project_path not in sys.path:
-       sys.path.insert(0, project_path)
-
-   os.environ["TRIBUANALISIS_COOKIE_SECURE"] = "1"
-   os.environ["TRIBUANALISIS_REGISTRATION_CODE"] = "TU-CODIGO-ALEATORIO-TEMPORAL"
-
-   from app import app as application
-   ```
-
-   La variable temporal impide que otra persona se registre antes de que confirmes el acceso a tu cuenta. La aplicación conserva SQLite y la clave de sesión en `instance`, dentro de tu espacio persistente.
-7. Guarda el WSGI y pulsa **Reload**. Inicia sesión con la cuenta local existente y confirma que aparecen tus casos e historial.
-8. Cuando verifiques los datos, quita la línea `TRIBUANALISIS_REGISTRATION_CODE` del WSGI y vuelve a pulsar **Reload**. Así habilitas el registro para otras personas. Comparte entonces el enlace público.
-
-El repositorio de GitHub se mantiene privado; la base SQLite y sus hashes de contraseña no forman parte del código publicado. Render también está configurado en `render.yaml`, pero su almacenamiento persistente requiere un plan de pago; su opción gratuita no es adecuada para conservar esta base SQLite.
+Este proyecto usa Flask y escribe en SQLite. El repositorio no incluye una adaptación específica para Vercel; antes de desplegarlo allí, verifica que el entorno conserve los archivos de la base de datos entre ejecuciones. No publiques `instance`, archivos `.db`, claves de sesión ni datos de usuarios. Si el almacenamiento del hosting es efímero, se necesita una base de datos persistente externa o adaptar la aplicación.
 
 ## Los cinco apartados
 
