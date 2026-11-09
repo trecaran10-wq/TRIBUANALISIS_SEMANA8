@@ -18,8 +18,23 @@
   async function api(url, options = {}) {
     const response = await fetch(url, options);
     const contentType = response.headers.get("content-type") || "";
-    const payload = contentType.includes("application/json") ? await response.json() : null;
-    if (!response.ok) throw new Error(payload?.error || `Error al consultar el servidor (${response.status}).`);
+    let payload = null;
+    if (contentType.includes("application/json")) {
+      try {
+        payload = await response.json();
+      } catch (error) {
+        if (!(error instanceof SyntaxError)) throw error;
+        throw new Error("El servidor envió una respuesta inválida. Vuelve a intentarlo o contacta al administrador.");
+      }
+    } else if (response.ok) {
+      throw new Error("El servidor envió una respuesta inesperada. Vuelve a intentarlo.");
+    }
+    if (!response.ok) {
+      const details = payload?.missing_headers?.length ? ` Columnas faltantes: ${payload.missing_headers.join(", ")}.` : "";
+      const error = new Error((payload?.error || `No se pudo completar la solicitud (${response.status}).`) + details);
+      error.payload = payload;
+      throw error;
+    }
     return payload;
   }
 
@@ -458,10 +473,20 @@
     if (!input.files.length) return;
     const formData = new FormData();
     formData.append("file", input.files[0]);
+    state.importBatch = null;
+    state.importRows = [];
+    $("#import-preview").hidden = true;
     try {
       const preview = await api("/api/import/preview", { method: "POST", body: formData });
+      if (!preview || typeof preview.batch_id !== "string" || !Array.isArray(preview.rows) ||
+          !preview.rows.every(row => row && row.data && Array.isArray(row.issues))) {
+        throw new Error("La vista previa recibida está incompleta. Vuelve a subir el archivo.");
+      }
       state.importBatch = preview.batch_id;
       state.importRows = preview.rows;
+      state.importRows.forEach(row => {
+        row.serverIssues = row.issues.map((message, index) => ({ message, column: row.issue_columns?.[index] ?? null }));
+      });
       renderImportPreview();
     } catch (error) {
       notify(error.message, true);
@@ -476,23 +501,22 @@
     const optionalNumbers = ["nrus_exempt_assets"];
     const validRuc = value => {
       const digits = String(value || "").replace(/\s/g, "");
-      if (!/^\d{11}$/.test(digits)) return false;
-      const total = [...digits.slice(0, 10)].reduce((sum, digit, index) => sum + Number(digit) * [5, 4, 3, 2, 7, 6, 5, 4, 3, 2][index], 0);
-      let check = (11 - total % 11) % 11;
-      if (check === 10) check = 0;
-      return check === Number(digits[10]);
+      return /^\d{11}$/.test(digits);
     };
     const validateRows = () => {
       const seen = new Set(state.cases.map(item => String(item.ruc)));
       rows.forEach(row => {
         const data = row.data;
-        const issues = [];
+        const issues = row.serverIssues.map(issue => issue.message);
         requiredText.forEach(key => { if (!String(data[key] || "").trim()) issues.push(`Falta ${key}.`); });
-        if (!validRuc(data.ruc)) issues.push("RUC o dígito verificador no válido.");
+        if (!validRuc(data.ruc)) issues.push("El RUC debe contener exactamente 11 dígitos.");
         if (!["natural", "juridica"].includes(String(data.person_type))) issues.push("Tipo de persona no válido.");
         requiredNumbers.forEach(key => {
           const value = Number(data[key]);
           if (data[key] === "" || data[key] == null || !Number.isFinite(value) || value < 0) issues.push(`Revisa ${key}.`);
+        });
+        ["workers", "workers_per_shift"].forEach(key => {
+          if (data[key] !== "" && data[key] != null && !Number.isInteger(Number(data[key]))) issues.push(`Revisa ${key}: debe ser una cantidad entera.`);
         });
         optionalNumbers.forEach(key => {
           if (data[key] !== "" && data[key] != null && (!Number.isFinite(Number(data[key])) || Number(data[key]) < 0)) issues.push(`Revisa ${key}.`);
@@ -517,11 +541,12 @@
     validateRows();
     const invalid = rows.filter(row => row.issues.length).length;
     root.hidden = false;
-    root.innerHTML = `<h3>Vista previa · ${rows.length} registro(s) ${invalid ? `· <span class="preview-error">${invalid} con observaciones</span>` : "· listos para importar"}</h3><p class="form-feedback">Corrige las celdas editables aquí; si una observación corresponde a otra columna, corrígela en Excel y vuelve a subirlo.</p><div class="table-scroll"><table><thead><tr><th>FILA</th>${fields.map(field => `<th>${field[1]}</th>`).join("")}<th>VALIDACIÓN</th></tr></thead><tbody>${rows.map((row, index) => `<tr><td>${row.row}</td>${fields.map(([key, , type]) => `<td>${type === "select" ? `<select data-import-index="${index}" data-import-key="${key}"><option value="natural" ${row.data[key] === "natural" ? "selected" : ""}>Natural</option><option value="juridica" ${row.data[key] === "juridica" ? "selected" : ""}>Jurídica</option></select>` : `<input data-import-index="${index}" data-import-key="${key}" type="${type}" value="${escapeHtml(row.data[key] ?? "")}" ${key === "ruc" ? 'maxlength="11"' : type === "number" ? 'min="0" step="any"' : ""} style="min-width:${type === "number" ? "82px" : "125px"}">`}</td>`).join("")}<td class="${row.issues.length ? "preview-error" : ""}">${row.issues.length ? escapeHtml(row.issues.join(" ")) : "Correcto"}</td></tr>`).join("")}</tbody></table></div><div class="form-actions"><span class="form-feedback">No se guardará ningún registro hasta confirmar la importación.</span><button class="button button-primary" type="button" id="confirm-import" ${invalid ? "disabled" : ""}>Confirmar importación <span>→</span></button></div>`;
+    root.innerHTML = `<h3>Vista previa · ${rows.length} registro(s) ${invalid ? `· <span class="preview-error">${invalid} con observaciones</span>` : "· listos para importar"}</h3><p class="form-feedback">Corrige las celdas editables aquí; si una observación corresponde a otra columna, corrígela en Excel y vuelve a subirlo.</p><div class="table-scroll"><table><thead><tr><th>FILA</th>${fields.map(field => `<th>${field[1]}</th>`).join("")}<th>VALIDACIÓN</th></tr></thead><tbody>${rows.map((row, index) => `<tr><td>${row.row}</td>${fields.map(([key, , type]) => `<td>${type === "select" ? `<select data-import-index="${index}" data-import-key="${key}"><option value="" ${!["natural", "juridica"].includes(row.data[key]) ? "selected" : ""}>Selecciona</option><option value="natural" ${row.data[key] === "natural" ? "selected" : ""}>Natural</option><option value="juridica" ${row.data[key] === "juridica" ? "selected" : ""}>Jurídica</option></select>` : `<input data-import-index="${index}" data-import-key="${key}" type="${type}" value="${escapeHtml(row.data[key] ?? "")}" ${key === "ruc" ? 'maxlength="11"' : type === "number" ? 'min="0" step="any"' : ""} style="min-width:${type === "number" ? "82px" : "125px"}">`}</td>`).join("")}<td class="${row.issues.length ? "preview-error" : ""}">${row.issues.length ? escapeHtml(row.issues.join(" ")) : "Correcto"}</td></tr>`).join("")}</tbody></table></div><div class="form-actions"><span class="form-feedback">No se guardará ningún registro hasta confirmar la importación.</span><button class="button button-primary" type="button" id="confirm-import" ${invalid ? "disabled" : ""}>Confirmar importación <span>→</span></button></div>`;
     $$("[data-import-index]", root).forEach(input => input.addEventListener("change", () => {
       const index = Number(input.dataset.importIndex);
       const key = input.dataset.importKey;
       state.importRows[index].data[key] = input.type === "number" ? input.value : input.value.trim();
+      state.importRows[index].serverIssues = state.importRows[index].serverIssues.filter(issue => issue.column !== key);
       renderImportPreview();
     }));
     $("#confirm-import")?.addEventListener("click", confirmImport);
@@ -537,6 +562,15 @@
       $("#import-form").reset();
       await refresh();
     } catch (error) {
+      if (Array.isArray(error.payload?.invalid_rows)) {
+        error.payload.invalid_rows.forEach(invalidRow => {
+          const row = state.importRows.find(item => item.row === invalidRow.row);
+          if (row && Array.isArray(invalidRow.issues)) {
+            row.serverIssues = invalidRow.issues.map(message => ({ message, column: /^Columna ([^:]+):/.exec(message)?.[1] ?? null }));
+          }
+        });
+        renderImportPreview();
+      }
       notify(error.message, true);
     }
   }

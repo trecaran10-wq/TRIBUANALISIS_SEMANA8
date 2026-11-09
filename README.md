@@ -42,6 +42,14 @@ No publiques `instance`, archivos `.db`, claves de sesión ni datos de usuarios.
 
 Chart.js se carga desde jsDelivr; para ver los gráficos, el navegador requiere conexión a Internet. El resto de la aplicación funciona localmente.
 
+## Importación de Excel
+
+Descarga la plantilla desde **Registro y análisis → Importación Excel**, conserva los encabezados y elimina la fila demostrativa. Solo son obligatorias las columnas y los valores indicados por la aplicación; los campos opcionales pueden quedar vacíos. Los importes deben ser números finitos no negativos, las cantidades de trabajadores, locales y sucursales deben ser enteras, y `taxable_share` debe estar entre 0 y 1. La fecha opcional `start_date` admite una fecha de Excel o `AAAA-MM-DD`; los campos booleanos admiten, entre otros, `sí`/`no` o `1`/`0`.
+
+La vista previa indica la fila y la columna que necesitan corrección. Puedes editar las columnas visibles; para corregir otras, modifica el Excel y vuelve a subirlo. La confirmación vuelve a validar todos los registros antes de guardarlos.
+
+El RUC debe tener 11 dígitos y no estar duplicado en la cuenta. La aplicación no verifica su dígito verificador ni consulta su existencia en SUNAT; confirma el RUC en SUNAT cuando corresponda.
+
 Las imágenes de `static\images\imagenes_para_subir` se usan en la barra lateral, el encabezado del Dashboard y la marca del proyecto. Puedes reemplazarlas conservando esos nombres para actualizar los recursos.
 
 Para la ilustración del encabezado de Registro y análisis, sube el recurso como `static\images\imagenes_registro\banner_registro.png`.

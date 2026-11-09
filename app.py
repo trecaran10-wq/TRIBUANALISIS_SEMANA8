@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import io
 import json
+import math
 import os
 import re
 import secrets
 import sqlite3
 import uuid
 import zipfile
-from datetime import datetime
+from datetime import date, datetime
 from functools import wraps
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,7 @@ from xml.sax.saxutils import escape as xml_escape
 import pandas as pd
 from openpyxl.utils.exceptions import InvalidFileException
 from flask import Flask, g, jsonify, render_template, request, send_file, session
+from flask.json.provider import DefaultJSONProvider
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from engine import evaluate_case, regime_catalog
@@ -26,6 +28,15 @@ ROOT = Path(__file__).resolve().parent
 INSTANCE = ROOT / "instance"
 DB_PATH = Path(os.environ.get("TRIBUANALISIS_DB", INSTANCE / "tribuanalisis.db"))
 app = Flask(__name__)
+
+
+class StrictJSONProvider(DefaultJSONProvider):
+    def dumps(self, obj: Any, **kwargs: Any) -> str:
+        kwargs["allow_nan"] = False
+        return super().dumps(obj, **kwargs)
+
+
+app.json = StrictJSONProvider(app)
 secret_key_file = INSTANCE / ".session-key"
 app.secret_key = os.environ.get("TRIBUANALISIS_SECRET_KEY")
 if not app.secret_key:
@@ -559,6 +570,12 @@ def cases_with_evaluations(db: DatabaseConnection, user_id: int) -> list[dict[st
     return result
 
 
+class CaseValidationError(ValueError):
+    def __init__(self, column: str, message: str):
+        self.column = column
+        super().__init__(f"Columna {column}: {message}")
+
+
 def validate_case_data(data: Any) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise ValueError("El contenido del caso debe ser un objeto.")
@@ -566,26 +583,21 @@ def validate_case_data(data: Any) -> dict[str, Any]:
     for key in (
         "business_name", "ruc", "person_type", "activity", "monthly_income",
         "projected_annual_income", "monthly_purchases", "projected_annual_purchases",
-        "annual_costs", "annual_expenses", "fixed_assets", "nrus_exempt_assets",
+        "annual_costs", "annual_expenses", "fixed_assets",
         "taxable_share", "workers", "workers_per_shift",
     ):
         if normalized.get(key) in (None, ""):
-            raise ValueError(f"El campo {key} es obligatorio.")
+            raise CaseValidationError(key, "el campo es obligatorio.")
     normalized["business_name"] = str(normalized["business_name"]).strip()
     normalized["activity"] = str(normalized["activity"]).strip()
-    if not normalized["business_name"] or not normalized["activity"]:
-        raise ValueError("La razón social y la actividad económica son obligatorias.")
+    for key in ("business_name", "activity"):
+        if not normalized[key]:
+            raise CaseValidationError(key, "el campo es obligatorio.")
     normalized["ruc"] = re.sub(r"\s+", "", str(normalized["ruc"]))
-    if not re.fullmatch(r"\d{11}", normalized["ruc"]):
-        raise ValueError("El RUC debe contener exactamente 11 dígitos.")
-    checksum = sum(int(digit) * weight for digit, weight in zip(normalized["ruc"][:10], (5, 4, 3, 2, 7, 6, 5, 4, 3, 2)))
-    check_digit = (11 - checksum % 11) % 11
-    if check_digit == 10:
-        check_digit = 0
-    if check_digit != int(normalized["ruc"][-1]):
-        raise ValueError("El dígito verificador del RUC no coincide. Confirma el número con SUNAT.")
+    if not re.fullmatch(r"[0-9]{11}", normalized["ruc"]):
+        raise CaseValidationError("ruc", "el RUC debe contener exactamente 11 dígitos.")
     if normalized["person_type"] not in ("natural", "juridica"):
-        raise ValueError("Selecciona persona natural o jurídica.")
+        raise CaseValidationError("person_type", "selecciona persona natural o jurídica.")
     numeric_fields = (
         "monthly_income", "projected_annual_income", "monthly_purchases",
         "projected_annual_purchases", "annual_costs", "annual_expenses",
@@ -597,33 +609,45 @@ def validate_case_data(data: Any) -> dict[str, Any]:
         try:
             value = float(normalized[key])
         except (TypeError, ValueError):
-            raise ValueError(f"El campo {key} debe ser numérico.") from None
+            raise CaseValidationError(key, "debe ser numérico.") from None
+        if not math.isfinite(value):
+            raise CaseValidationError(key, "debe ser un número finito.")
         if value < 0:
-            raise ValueError(f"El campo {key} no puede ser negativo.")
+            raise CaseValidationError(key, "no puede ser negativo.")
         if key == "taxable_share" and value > 1:
-            raise ValueError("La proporción gravada debe estar entre 0 y 1.")
+            raise CaseValidationError(key, "la proporción gravada debe estar entre 0 y 1.")
+        if key in ("workers", "workers_per_shift", "locales", "branches") and not value.is_integer():
+            raise CaseValidationError(key, "debe ser una cantidad entera.")
         normalized[key] = value
     normalized["workers"] = int(normalized["workers"])
     normalized["workers_per_shift"] = int(normalized["workers_per_shift"])
     if normalized["nrus_exempt_assets"] > normalized["fixed_assets"]:
-        raise ValueError("Los activos que podrían excluirse no pueden superar el valor total de activos fijos.")
-    def parse_bool(value: Any) -> bool:
+        raise CaseValidationError("nrus_exempt_assets", "los activos excluibles no pueden superar los activos fijos.")
+    if normalized.get("start_date") not in (None, ""):
+        try:
+            normalized["start_date"] = date.fromisoformat(str(normalized["start_date"])).isoformat()
+        except ValueError:
+            raise CaseValidationError("start_date", "ingresa una fecha válida en formato AAAA-MM-DD.") from None
+
+    def parse_bool(value: Any, column: str) -> bool:
         if isinstance(value, bool):
             return value
         if value is None or value == "":
             return False
         if isinstance(value, (int, float)):
-            return value != 0
+            if value in (0, 1):
+                return bool(value)
+            raise CaseValidationError(column, "usa sí/no o 1/0.")
         normalized_value = str(value).strip().lower()
         if normalized_value in ("1", "true", "yes", "sí", "si", "x"):
             return True
         if normalized_value in ("0", "false", "no", "n", "none"):
             return False
-        raise ValueError(f"Valor booleano no válido: {value}")
+        raise CaseValidationError(column, "usa sí/no o 1/0.")
 
-    normalized["excluded_activity"] = parse_bool(normalized.get("excluded_activity"))
+    normalized["excluded_activity"] = parse_bool(normalized.get("excluded_activity"), "excluded_activity")
     plans = normalized.get("plans") if isinstance(normalized.get("plans"), dict) else {}
-    normalized["plans"] = {key: parse_bool(value) for key, value in plans.items()}
+    normalized["plans"] = {key: parse_bool(value, f"plans_{key}") for key, value in plans.items()}
     return normalized
 
 
@@ -635,7 +659,7 @@ def insert_case(db: DatabaseConnection, data: dict[str, Any]) -> int:
     cursor = db.execute(
         """INSERT INTO cases (owner_id,code,ruc,business_name,status,recommended_regime,data_json,created_at,updated_at)
            VALUES (?,?,?,?,'pending',NULL,?,?,?) RETURNING id""",
-        (user_id, code, record["ruc"], record["business_name"], json.dumps(record, ensure_ascii=False), timestamp, timestamp),
+        (user_id, code, record["ruc"], record["business_name"], json.dumps(record, ensure_ascii=False, allow_nan=False), timestamp, timestamp),
     )
     return int(cursor.fetchone()["id"])
 
@@ -782,7 +806,7 @@ def update_case(case_id: int):
             return jsonify({"error": "Caso no encontrado."}), 404
         db.execute(
             "UPDATE cases SET ruc=?,business_name=?,data_json=?,status='pending',recommended_regime=NULL,updated_at=? WHERE id=? AND owner_id=?",
-            (data["ruc"], data["business_name"], json.dumps(data, ensure_ascii=False), now(), case_id, user_id),
+            (data["ruc"], data["business_name"], json.dumps(data, ensure_ascii=False, allow_nan=False), now(), case_id, user_id),
         )
         db.commit()
         row = db.execute("SELECT * FROM cases WHERE id=? AND owner_id=?", (case_id, user_id)).fetchone()
@@ -818,7 +842,7 @@ def evaluate(case_id: int):
             "UPDATE cases SET status=?,recommended_regime=?,updated_at=? WHERE id=? AND owner_id=?",
             ("analyzed", result["recommendation"], timestamp, case_id, user_id),
         )
-        db.execute("INSERT INTO evaluations (case_id,result_json,created_at,case_updated_at) VALUES (?,?,?,?)", (case_id, json.dumps(result, ensure_ascii=False), timestamp, timestamp))
+        db.execute("INSERT INTO evaluations (case_id,result_json,created_at,case_updated_at) VALUES (?,?,?,?)", (case_id, json.dumps(result, ensure_ascii=False, allow_nan=False), timestamp, timestamp))
         db.commit()
     return jsonify({"result": result, "created_at": timestamp})
 
@@ -943,17 +967,25 @@ def preview_import():
         frame = pd.read_excel(file, dtype={"ruc": str})
     except (ValueError, OSError, zipfile.BadZipFile, InvalidFileException) as exc:
         raise ValueError(f"No se pudo leer el archivo Excel: {exc}") from exc
+    frame.columns = frame.columns.map(str)
     missing = sorted(REQUIRED_EXCEL - set(frame.columns))
     if missing:
         return jsonify({"error": "Faltan encabezados obligatorios.", "missing_headers": missing, "expected_headers": EXCEL_COLUMNS}), 400
     if frame.empty:
         raise ValueError("El archivo no contiene registros para importar.")
-    frame = frame.where(pd.notna(frame), None)
+    frame = frame.astype(object).where(pd.notna(frame), None)
     rows = frame.to_dict(orient="records")
+    invalid_cells = []
     for row in rows:
+        invalid_columns = []
         for key, value in list(row.items()):
+            if isinstance(value, float) and not math.isfinite(value):
+                row[key] = None
+                invalid_columns.append(key)
+                continue
             if hasattr(value, "isoformat") and not isinstance(value, (str, int, float, bool)):
                 row[key] = value.date().isoformat() if hasattr(value, "date") else value.isoformat()
+        invalid_cells.append(invalid_columns)
     seen: set[str] = set()
     user_id = current_user_id()
     with connect_db() as db:
@@ -972,20 +1004,26 @@ def preview_import():
             "grow_company": data.pop("plans_grow_company", False),
             "excluded_activity": data.pop("plans_excluded_activity", False),
         }
-        issues: list[str] = []
+        issues: list[str] = [f"Columna {key}: el valor debe ser finito." for key in invalid_cells[index - 2]]
+        issue_columns: list[str | None] = list(invalid_cells[index - 2])
         try:
-            data = validate_case_data(data)
-            if data["business_name"].lower().startswith("ejemplo académico"):
-                issues.append("Fila demostrativa de la plantilla: elimínala antes de importar.")
-            if data["ruc"] in existing or data["ruc"] in seen:
-                issues.append("RUC duplicado (ya registrado o repetido en el archivo).")
-            seen.add(data["ruc"])
+            validated = validate_case_data(data)
+            if not invalid_cells[index - 2]:
+                data = validated
+            if validated["business_name"].lower().startswith("ejemplo académico"):
+                issues.append("Columna business_name: elimina la fila demostrativa de la plantilla.")
+                issue_columns.append("business_name")
+            if validated["ruc"] in existing or validated["ruc"] in seen:
+                issues.append("Columna ruc: RUC duplicado (ya registrado o repetido en el archivo).")
+                issue_columns.append("ruc")
+            seen.add(validated["ruc"])
         except ValueError as exc:
             issues.append(str(exc))
-        previews.append({"row": index, "data": data, "issues": issues})
+            issue_columns.append(exc.column if isinstance(exc, CaseValidationError) else None)
+        previews.append({"row": index, "data": data, "issues": issues, "issue_columns": issue_columns, "invalid_cells": invalid_cells[index - 2]})
     batch_id = uuid.uuid4().hex
     with connect_db() as db:
-        db.execute("INSERT INTO import_batches (id,rows_json,created_at,owner_id) VALUES (?,?,?,?)", (batch_id, json.dumps(previews, ensure_ascii=False, default=str), now(), user_id))
+        db.execute("INSERT INTO import_batches (id,rows_json,created_at,owner_id) VALUES (?,?,?,?)", (batch_id, json.dumps(previews, ensure_ascii=False, allow_nan=False), now(), user_id))
         db.commit()
     return jsonify({"batch_id": batch_id, "total": len(previews), "rows": previews, "expected_headers": EXCEL_COLUMNS})
 
@@ -1010,9 +1048,18 @@ def confirm_import():
         existing = {row["ruc"] for row in db.execute("SELECT ruc FROM cases WHERE owner_id=?", (user_id,))}
         for index, row in enumerate(submitted_rows):
             try:
-                data = validate_case_data(row.get("data"))
+                submitted_data = row.get("data")
+                if not isinstance(submitted_data, dict):
+                    raise ValueError("El contenido del caso debe ser un objeto.")
+                for column in preview_rows[index].get("invalid_cells", []):
+                    value = submitted_data.get("plans", {}).get(column[6:]) if column.startswith("plans_") else submitted_data.get(column)
+                    if value in (None, ""):
+                        raise CaseValidationError(column, "corrige el valor no finito en el Excel.")
+                data = validate_case_data(submitted_data)
+                if data["business_name"].lower().startswith("ejemplo académico"):
+                    raise CaseValidationError("business_name", "elimina la fila demostrativa de la plantilla.")
                 if data["ruc"] in existing or data["ruc"] in seen:
-                    raise ValueError("RUC duplicado (ya registrado o repetido en el archivo).")
+                    raise CaseValidationError("ruc", "RUC duplicado (ya registrado o repetido en el archivo).")
                 seen.add(data["ruc"])
                 records.append(data)
             except (ValueError, AttributeError) as exc:

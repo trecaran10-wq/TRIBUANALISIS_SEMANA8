@@ -1,4 +1,5 @@
 import io
+import json
 import os
 import sqlite3
 import sys
@@ -256,11 +257,30 @@ class ApplicationTests(unittest.TestCase):
         self.assertIsNone(response.get_json()["latest_evaluation"])
         self.assertEqual(len(self.client.get(f"/api/cases/{case['id']}/history").get_json()), 1)
 
-    def test_invalid_ruc_is_rejected(self):
-        case = sample_case(ruc="20123456789")
-        response = self.client.post("/api/cases", json=case)
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("verificador", response.get_json()["error"])
+    def test_ruc_requires_eleven_digits_but_not_checksum(self):
+        response = self.client.post("/api/cases", json=sample_case(ruc="20123456789"))
+        self.assertEqual(response.status_code, 201, response.get_json())
+        duplicate = self.client.post("/api/cases", json=sample_case(ruc="20123456789"))
+        self.assertEqual(duplicate.status_code, 409)
+        for ruc in ("1234567890", "123456789012", "2012345678x"):
+            with self.subTest(ruc=ruc):
+                invalid = self.client.post("/api/cases", json=sample_case(ruc=ruc))
+                self.assertEqual(invalid.status_code, 400, invalid.get_json())
+                self.assertIn("11 dígitos", invalid.get_json()["error"])
+
+    def test_excel_import_accepts_ruc_without_matching_checksum(self):
+        data = sample_case(ruc="20123456789")
+        data.pop("plans")
+        stream = io.BytesIO()
+        pd.DataFrame([data]).to_excel(stream, index=False)
+        stream.seek(0)
+        preview = self.client.post("/api/import/preview", data={"file": (stream, "casos.xlsx")})
+        self.assertEqual(preview.status_code, 200, preview.get_json())
+        payload = preview.get_json()
+        self.assertEqual(payload["rows"][0]["issues"], [])
+        confirmed = self.client.post("/api/import/confirm", json={"batch_id": payload["batch_id"], "rows": payload["rows"]})
+        self.assertEqual(confirmed.status_code, 200, confirmed.get_json())
+        self.assertEqual(self.client.get("/api/cases").get_json()[0]["ruc"], "20123456789")
 
     def test_excel_template_can_be_opened_and_import_preview_rejects_demo_row(self):
         template = self.client.get("/api/import/template.xlsx")
@@ -292,6 +312,117 @@ class ApplicationTests(unittest.TestCase):
         confirmed = self.client.post("/api/import/confirm", json={"batch_id": payload["batch_id"], "rows": payload["rows"]})
         self.assertEqual(confirmed.status_code, 200, confirmed.get_json())
         self.assertEqual(confirmed.get_json()["imported"], 1)
+
+    def test_excel_template_optional_blanks_produce_strict_json_and_import(self):
+        data = {column: None for column in webapp.EXCEL_COLUMNS}
+        data.update(sample_case())
+        data.pop("plans")
+        data["nrus_exempt_assets"] = None
+        stream = io.BytesIO()
+        pd.DataFrame([data]).to_excel(stream, index=False)
+        stream.seek(0)
+        response = self.client.post("/api/import/preview", data={"file": (stream, "casos.xlsx")})
+        self.assertEqual(response.status_code, 200)
+        payload = json.loads(response.data, parse_constant=lambda value: self.fail(f"JSON no válido: {value}"))
+        self.assertEqual(payload["rows"][0]["data"]["additional_activities"], None)
+        self.assertFalse(payload["rows"][0]["issues"])
+        with webapp.connect_db() as db:
+            batch = db.execute("SELECT rows_json FROM import_batches WHERE id=?", (payload["batch_id"],)).fetchone()
+        json.loads(batch["rows_json"], parse_constant=lambda value: self.fail(f"Lote JSON no válido: {value}"))
+        confirmed = self.client.post("/api/import/confirm", json={"batch_id": payload["batch_id"], "rows": payload["rows"]})
+        self.assertEqual(confirmed.status_code, 200, confirmed.get_json())
+
+    def test_excel_required_blank_reports_row_and_column_without_partial_import(self):
+        first = sample_case()
+        first.pop("plans")
+        second = sample_case(ruc=make_ruc("2012345679"))
+        second.pop("plans")
+        second["monthly_income"] = None
+        stream = io.BytesIO()
+        pd.DataFrame([first, second]).to_excel(stream, index=False)
+        stream.seek(0)
+        response = self.client.post("/api/import/preview", data={"file": (stream, "casos.xlsx")})
+        payload = json.loads(response.data, parse_constant=lambda value: self.fail(f"JSON no válido: {value}"))
+        self.assertEqual(payload["rows"][1]["row"], 3)
+        self.assertIn("monthly_income", " ".join(payload["rows"][1]["issues"]))
+        confirmed = self.client.post("/api/import/confirm", json={"batch_id": payload["batch_id"], "rows": payload["rows"]})
+        self.assertEqual(confirmed.status_code, 400, confirmed.get_json())
+        self.assertEqual(confirmed.get_json()["invalid_rows"][0]["row"], 3)
+        self.assertEqual(self.client.get("/api/cases").get_json(), [])
+
+    def test_excel_reports_invalid_cells_and_confirmation_revalidates(self):
+        examples = [
+            ("monthly_income", -1),
+            ("monthly_purchases", "abc"),
+            ("workers", 1.5),
+            ("branches", 1.5),
+            ("taxable_share", 1.1),
+            ("start_date", "2024-02-30"),
+            ("excluded_activity", "tal vez"),
+            ("plans_import", 2),
+        ]
+        for column, value in examples:
+            with self.subTest(column=column):
+                row = sample_case()
+                row.pop("plans")
+                row[column] = value
+                stream = io.BytesIO()
+                pd.DataFrame([row]).to_excel(stream, index=False)
+                stream.seek(0)
+                response = self.client.post("/api/import/preview", data={"file": (stream, "casos.xlsx")})
+                self.assertEqual(response.status_code, 200, response.data)
+                payload = response.get_json()
+                preview_row = payload["rows"][0]
+                self.assertEqual(preview_row["row"], 2)
+                self.assertIn(column, " ".join(preview_row["issues"]))
+                self.assertIn(column, preview_row["issue_columns"])
+                confirmed = self.client.post("/api/import/confirm", json={"batch_id": payload["batch_id"], "rows": payload["rows"]})
+                self.assertEqual(confirmed.status_code, 400, confirmed.get_json())
+                invalid = confirmed.get_json()["invalid_rows"][0]
+                self.assertEqual(invalid["row"], 2)
+                self.assertIn(column, " ".join(invalid["issues"]))
+
+    def test_excel_infinity_is_null_and_must_be_corrected(self):
+        row = sample_case()
+        row.pop("plans")
+        row["nrus_exempt_assets"] = float("inf")
+        row["plans_import"] = float("-inf")
+        stream = io.BytesIO()
+        pd.DataFrame([row]).to_excel(stream, index=False)
+        stream.seek(0)
+        response = self.client.post("/api/import/preview", data={"file": (stream, "casos.xlsx")})
+        self.assertEqual(response.status_code, 200, response.data)
+        payload = json.loads(response.data, parse_constant=lambda value: self.fail(f"JSON no válido: {value}"))
+        preview_row = payload["rows"][0]
+        self.assertIsNone(preview_row["data"]["nrus_exempt_assets"])
+        self.assertIsNone(preview_row["data"]["plans"]["import"])
+        self.assertEqual(set(preview_row["invalid_cells"]), {"nrus_exempt_assets", "plans_import"})
+        rejected = self.client.post("/api/import/confirm", json={"batch_id": payload["batch_id"], "rows": payload["rows"]})
+        self.assertEqual(rejected.status_code, 400, rejected.get_json())
+        preview_row["data"]["nrus_exempt_assets"] = 0
+        preview_row["data"]["plans"]["import"] = False
+        accepted = self.client.post("/api/import/confirm", json={"batch_id": payload["batch_id"], "rows": payload["rows"]})
+        self.assertEqual(accepted.status_code, 200, accepted.get_json())
+
+    def test_excel_dates_and_boolean_values_are_normalized(self):
+        row = sample_case()
+        row.pop("plans")
+        row.update(start_date=pd.Timestamp("2024-02-29"), excluded_activity="sí", plans_import="no")
+        stream = io.BytesIO()
+        pd.DataFrame([row]).to_excel(stream, index=False)
+        stream.seek(0)
+        response = self.client.post("/api/import/preview", data={"file": (stream, "casos.xlsx")})
+        self.assertEqual(response.status_code, 200, response.data)
+        preview_row = response.get_json()["rows"][0]
+        self.assertEqual(preview_row["issues"], [])
+        self.assertEqual(preview_row["data"]["start_date"], "2024-02-29")
+        self.assertIs(preview_row["data"]["excluded_activity"], True)
+        self.assertIs(preview_row["data"]["plans"]["import"], False)
+
+    def test_flask_json_rejects_nonfinite_values(self):
+        for value in (float("nan"), float("inf"), float("-inf")):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                webapp.app.json.dumps({"value": value})
 
     def test_delete_removes_case(self):
         case = self.client.post("/api/cases", json=sample_case()).get_json()
